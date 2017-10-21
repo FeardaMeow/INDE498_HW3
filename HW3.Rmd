@@ -1,0 +1,28 @@
+---
+title: "INDE498_HW3"
+author: "Steven Hwang, Haena Kim, Victoria Diaz"
+date: "October 21, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rpart)
+library(rpart.plot)
+
+```
+
+# Chapter 4, Exercise 1
+Use AGE as the new outcome variable. Build a random forest model to predict it. Identify the final models you would select, evaluate the model, and compare it with the decision tree model. 
+
+# Chapter 4, Exercise 2
+Find two datasets from the UCI data repository or R datasets. Conduct a detailed analysis for both datasets using the random forest model. Also comment on the application of your model on the context of the dataset you have selected. 
+
+# Chapter 4, Exercise 3
+Pick up any dataset you have used, and randomly split the data into two halves. Use one half to build the random forest model. Test the model's prediction performance on the second half. Report what you have found, adjust your way of model building, and suggest a strategy to find the model you consider as the best.
+
+# Chapter 4, Exercise 4
+Write your own R script to use Bootstrap to evaluate the significance of the regression parameters of logistic regression model. Compare your results with the output from glm().
+
+# Chapter 5, Exercise 1
+Find ten classification datasets from the UCI data repository or R datasets. Using these datasets, conduct experiments to see if the cross-validation method on training data can provide an approximation of the testing error on a testing data, as shown in Figure5.8. 
