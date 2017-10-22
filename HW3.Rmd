@@ -9,7 +9,15 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(rpart)
 library(rpart.plot)
+library(dplyr)
+library(boot)
 
+ch4ex2.gpa <- read.csv("MedGPA.csv", colClasses = c("character",rep("factor",3),rep("numeric",2),rep("integer",6)))
+ch4ex2.bh <- read.csv("badhealth.csv", colClasses = c("character","integer","factor","integer"))
+
+#Remove first column
+ch4ex2.gpa <- ch4ex2.gpa %>% select(-X)
+ch4ex2.bh <- ch4ex2.bh %>% select(-X)
 ```
 
 # Chapter 4, Exercise 1
@@ -18,11 +26,29 @@ Use AGE as the new outcome variable. Build a random forest model to predict it. 
 # Chapter 4, Exercise 2
 Find two datasets from the UCI data repository or R datasets. Conduct a detailed analysis for both datasets using the random forest model. Also comment on the application of your model on the context of the dataset you have selected. 
 
+## Med GPA
+
+## Bad Health
+
 # Chapter 4, Exercise 3
 Pick up any dataset you have used, and randomly split the data into two halves. Use one half to build the random forest model. Test the model's prediction performance on the second half. Report what you have found, adjust your way of model building, and suggest a strategy to find the model you consider as the best.
 
 # Chapter 4, Exercise 4
 Write your own R script to use Bootstrap to evaluate the significance of the regression parameters of logistic regression model. Compare your results with the output from glm().
 
+```{r}
+logCoeff.p = function(data,b,formula) {
+  d <- data[b,]
+  return(coefficients(glm(formula, family = binomial(link='logit'),data=d)))
+}
+
+boottest <- boot(data = ch4ex2.bh, statistic=logCoeff.p, R=100, formula=badh~numvisit+age)
+#Intercept p-value
+pval1 <- mean(abs(boottest$t[,1]-mean(boottest$t[,1])) > abs(boottest$t0[1]))
+pval2 <- mean(abs(boottest$t[,2]-mean(boottest$t[,2])) > abs(boottest$t0[2]))
+pval3 <- mean(abs(boottest$t[,3]-mean(boottest$t[,3])) > abs(boottest$t0[3]))
+
+summary(glm(badh~., family = binomial(link='logit'),data=ch4ex2.bh))
+```
 # Chapter 5, Exercise 1
 Find ten classification datasets from the UCI data repository or R datasets. Using these datasets, conduct experiments to see if the cross-validation method on training data can provide an approximation of the testing error on a testing data, as shown in Figure5.8. 
