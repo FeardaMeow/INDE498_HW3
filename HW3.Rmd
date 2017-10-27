@@ -23,6 +23,186 @@ ch4ex2.bh <- ch4ex2.bh %>% select(-X)
 # Chapter 4, Exercise 1
 Use AGE as the new outcome variable. Build a random forest model to predict it. Identify the final models you would select, evaluate the model, and compare it with the decision tree model. 
 
+```{r}
+library(RCurl)
+library(rpart.plot)
+library(rpart)
+data <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+```
+
+We will plot the error rates associated to the number of trees in a random forest to see its impact. We see that our error rate lessens and stabilizes when the number of trees is greater than 100. We notice that one of the best looking box plots is when the number of trees is equal to 200. We will use a random forest of 200 trees in our calculations. 
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+require(randomForest)
+set.seed(1)
+
+theme_set(theme_gray(base_size = 15)) 
+
+# define AGE_bin 
+data$AGE_bin <- ifelse(data$AGE >= mean(data$AGE), 1, 0)
+
+target_indx <- which( colnames(data) == "AGE_bin" )
+data[,target_indx] <- as.factor(paste0("c", data[,target_indx]))
+rm_indx <-  which( colnames(data) %in% c("ID","TOTAL13","MMSCORE", "DX_bl", "AGE") )
+data <- data[,-rm_indx]
+
+results <- NULL
+for( itree in c(1:9, 10, 20, 50, 100, 200, 300, 400, 500, 600, 700)  ){
+  for(i in 1:20){
+      train.ix <- sample(nrow(data),floor( nrow(data)/2) )
+      rf <- randomForest( AGE_bin ~ ., ntree = itree, data = data[train.ix,] ) 
+      pred.test <- predict(rf, data[-train.ix,],type="class")
+      this.err <-  length(which(pred.test != data[-train.ix,]$AGE_bin))/length(pred.test) 
+      results <- rbind( results, c(itree, this.err)  )
+  }
+}
+
+colnames(results) <- c("num_trees","error")
+results <- as.data.frame(results) %>% mutate(num_trees=as.character(num_trees))
+levels( results$num_trees ) <- unique( results$num_trees  )
+results$num_trees <- factor( results$num_trees , unique( results$num_trees  )  )
+ggplot() +
+  geom_boxplot(data = results, aes(y = error, x = num_trees)) +
+  geom_point(size=3) 
+```
+
+
+Let's create our random forest with 200 trees and analyze which variables are important. From the plot, we see that the important variables are HippoNV, FDG, AV45, and PTEDUCAT (in order from greatest to least importance). 
+```{r}
+# creating the random forest
+random_forest_1 <- randomForest(AGE_bin ~ ., ntree = 200, data = data ) 
+
+# plotting the importance of each variable
+varImpPlot(random_forest_1)
+```
+
+
+We create a random forest of 200 trees with the previously defined important variables. Since the importance of the variables can change (since the predictors changed), we plot their importance yet again. We notice that all of the considered variables are important and their order of importance has stayed the same. 
+We will only consider these predictors in our model from now on. 
+```{r}
+# create the random forest
+random_forest_2 <- randomForest(AGE_bin ~ HippoNV + FDG + AV45 + PTEDUCAT, ntree = 200, data = data ) 
+
+# plotting the importance of each variable
+varImpPlot(random_forest_2)
+```
+
+
+We now test to see how the node size affects the error rate. We notice that there are not major changes when different node sizes are considered. We will choose to have a node size of 6, since this node size corresponds to one of the best box plots. 
+```{r}
+results <- NULL
+for( inodesize in c(1:9, 10, 20, 50, 100)  ){
+  for(i in 1:20){
+      train.ix <- sample(nrow(data),floor( nrow(data)/2) )
+      rf <- randomForest( AGE_bin ~ ., ntree = 200, nodesize = inodesize, data = data[train.ix,] ) 
+      pred.test <- predict(rf, data[-train.ix,],type="class")
+      this.err <-  length(which(pred.test != data[-train.ix,]$AGE_bin))/length(pred.test) 
+      results <- rbind( results, c(inodesize, this.err)  )
+  }
+}
+
+colnames(results) <- c("node_size","error")
+results <- as.data.frame(results) %>% mutate(node_size=as.character(node_size))
+levels( results$node_size ) <- unique( results$node_size  )
+results$node_size <- factor( results$node_size , unique( results$node_size  )  )
+ggplot() +
+  geom_boxplot(data = results, aes(y = error, x = node_size)) +
+  geom_point(size=3) 
+```
+
+
+Thus far we have considered the number of trees, the size of the nodes, and the importance of each predictor variable. Choosing the best of each of these categories, we create our final random forest. 
+```{r} 
+# create the random forest
+random_forest_final <- randomForest(AGE_bin ~ HippoNV + FDG + AV45 + PTEDUCAT, ntree = 200, nodesize = 6, data = data ) 
+```
+
+We recall our analysis of the decision tree for predicting AGE_bin from the last homework. 
+We begin by creating a decision tree. 
+```{r}
+data$AGE_bin <- as.factor(data$AGE_bin)
+tree_1 <- rpart(AGE_bin ~., data = data)
+prp(tree_1, varlen=5)
+```
+
+
+When we look at the variable importance of each predictor, we see that the most important variables are HippoNV and FDG. 
+```{r}
+print(tree_1$variable.importance)
+```
+
+
+Our objective is now to prune the tree. Testing different different values for cp, we see that our decision tree is most accurate when our tree has about 3 to 4 leaves. 
+```{r,cache=FALSE}
+library(magrittr)
+library(tidyr)
+library(ggplot2)
+library(rpart)
+library(rpart.plot)
+library(dplyr)
+library(partykit)
+
+set.seed(1)
+train.ix <- sample(nrow(data),floor( nrow(data)/2) )
+err.train.v <- NULL
+err.test.v <- NULL
+leaf.v <- NULL
+for(i in seq(0.2,0,by=-0.005) ){
+tree <- rpart( AGE_bin ~ ., data = data[train.ix,], cp=i  ) 
+pred.train <- predict(tree, data[train.ix,],type="class")
+pred.test <- predict(tree, data[-train.ix,],type="class")
+current.err.train <- length(which(pred.train != data[train.ix,]$AGE_bin))/length(pred.train)
+current.err.test <- length(which(pred.test != data[-train.ix,]$AGE_bin))/length(pred.test)
+err.train.v <- c(err.train.v, current.err.train)
+err.test.v <- c(err.test.v, current.err.test)
+leaf.v <- c(leaf.v, length(which(tree$frame$var == "<leaf>")))
+}
+err.mat <- as.data.frame( cbind( train_err = err.train.v, test_err = err.test.v , leaf_num = leaf.v ) )
+err.mat$leaf_num <- as.factor( err.mat$leaf_num  )
+err.mat <- unique(err.mat)
+err.mat <- err.mat %>% gather(type, error, train_err,test_err)
+
+# visualizing this 
+data.plot <- err.mat %>% mutate(type = factor(type))
+ggplot(data.plot, aes(x=leaf_num, y=error, shape = type, color=type)) + geom_line() +
+geom_point(size=3) 
+```
+
+We plot a more optimal decision tree which is only dependent on the two most important variables. 
+```{r}
+tree_final <- prune(tree,cp =0.0319, depth = 3)
+prp(tree_final,nn.cex=1)
+```
+
+Now, we will now compare random_forest_final with tree_final. We see that the error rates with random_forest_final are less than that with tree_final. Moreover, the error rate with respect to the random forest is more centered around its mean, which means that the error rate with respect to the random forest can be estimated more accurately. 
+```{r} 
+err.tree <- NULL
+err.rf <- NULL
+for(i in 1:20){
+    train.ix <- sample(nrow(data),floor( nrow(data)/2) )
+    tree <- rpart( AGE_bin ~ ., data = data[train.ix,] ) 
+    pred.test <- predict(tree, data[-train.ix,],type="class")
+    err.tree <- c(err.tree, length(which(pred.test != data[-train.ix,]$AGE_bin))/length(pred.test) )
+    
+    rf <- randomForest( AGE_bin ~ ., data = data[train.ix,] ) 
+    pred.test <- predict(rf, data[-train.ix,],type="class")
+    err.rf <- c(err.rf, length(which(pred.test != data[-train.ix,]$AGE_bin))/length(pred.test) )
+}
+err.tree <- data.frame( err = err.tree , method = "tree" )
+err.rf <- data.frame( err = err.rf , method = "random_forests" )
+
+ggplot() +
+  geom_boxplot(data = rbind(err.tree,err.rf), aes(y = err, x = method)) +
+  geom_point(size=3)
+```
+
+
+
+
+
 # Chapter 4, Exercise 2
 Find two datasets from the UCI data repository or R datasets. Conduct a detailed analysis for both datasets using the random forest model. Also comment on the application of your model on the context of the dataset you have selected. 
 
