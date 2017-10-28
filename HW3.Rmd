@@ -330,3 +330,40 @@ summary(glm(badh~., family = binomial(link='logit'),data=ch4ex2.bh))
 ```
 # Chapter 5, Exercise 1
 Find ten classification datasets from the UCI data repository or R datasets. Using these datasets, conduct experiments to see if the cross-validation method on training data can provide an approximation of the testing error on a testing data, as shown in Figure5.8. 
+
+```{r, message=FALSE}
+library(MASS)
+library(datasets)
+library(caret)
+library(knitr)
+results <- data.frame(data=character(), RMSE=double(), RMSESD=double(), testRMSE=double())
+data.sets <- c("Rabbit","CO2","faithful","cats","iris","ToothGrowth","wtloss","warpbreaks","GAGurine","cars")
+formula <- c("BPchange~Dose+Run+Treatment+Animal",
+             "uptake~Type+Treatment+conc",
+             "eruptions~waiting",
+             "Bwt~Sex+Hwt",
+             "Sepal.Length~Sepal.Width+Petal.Length+Petal.Width+Species",
+             "len~supp+dose",
+             "Weight~Days",
+             "breaks~wool+tension",
+             "GAG~Age",
+             "dist~speed")
+value <- c("BPchange","uptake","eruptions","Bwt","Sepal.Length","len","Weight","breaks","GAG","dist")
+for (i in 1:10) {
+  #Create initial train, test split
+  trainIndex <- createDataPartition(get(data.sets[i])[,value[i]], p=0.5, list=FALSE)
+  data_train <- get(data.sets[i])[trainIndex,]
+  data_test <- get(data.sets[i])[-trainIndex,]
+  tenfold_cv <- trainControl(method="cv", number=10)
+  
+  model <- train(formula(formula[i]), data=data_train, trControl=tenfold_cv, method="lm")
+  test.RMSE <- predict(lm(formula(formula[i]), data=data_train), data=data_test)
+  test.RMSE <- sqrt(mean((data_test[,value[i]]-test.RMSE)^2))
+  temp <- data.frame(data=data.sets[i], RMSE=model$results$RMSE, RMSESD=model$results$RMSESD, testRMSE=test.RMSE)
+  results <- rbind(results,temp)
+}
+
+```
+```{r}
+kable(results, caption = "A table of the 10-fold cross validation root mean square error and standard deviation compared to the test set root mean square error")
+```
