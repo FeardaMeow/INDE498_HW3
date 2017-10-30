@@ -298,7 +298,7 @@ Thus far we have considered the number of trees, the size of the nodes, and the 
 random_forest_3 <- randomForest(Acceptance ~ BS + GPA + BCPM, ntree = 50, nodesize = 8, data = ch4ex2.gpa) 
 ```
 
-We now compare the results of the random forests. The random forest with 50 trees (random_forest_1) gave us an OOB error of 22.22%; the random forest with 50 trees and 3 predictors (random_forest_2) gave us an OOB error of 29.63%; and the random forest with 50 trees, 3 predictors, and a node size of 8 (random_forest_3) gave us an OOB error of 20.37%. Moreover, random_forest_3 has the minimum number (5) of instances misclassifying class c0 and the second minimum number (6) of instances misclassifying the class c1. We conclude that random_forest_3 is the best (out of three) random forest for the given dataset. 
+We now compare the results of the random forests. The random forest with 50 trees (random_forest_1) gave us an OOB error of 29.63%; the random forest with 50 trees and 3 predictors (random_forest_2) gave us an OOB error of 22.22%; and the random forest with 50 trees, 3 predictors, and a node size of 8 (random_forest_3) gave us an OOB error of 20.37%. Moreover, random_forest_3 has the minimum number (5) of instances misclassifying class c0 and the second minimum number (6) of instances misclassifying the class c1. We conclude that random_forest_3 is the best (out of three) random forest for the given dataset. 
 ```{r} 
 random_forest_1
 random_forest_2
@@ -307,9 +307,208 @@ random_forest_3
 This random forest sheds light on the most important predictors of a student getting accepted into a medical school. The important predictors are: grade point average, Bio/Chem/Physics/Math grade point average, and Biological Sciences subscore. Given these predictors, this model can determine whether or not a student will be accepted with an approximate 79% accuracy rate. 
 
 ## Bad Health
+We will plot the error rates associated to the number of trees in a random forest to see its impact. We notice that one of the best looking box plots (other than the one outlier) is when the number of trees is equal to 600. We will use a random forest of 600 trees in our calculations. 
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+require(randomForest)
+set.seed(1)
+
+
+# we will remove the one observation which has an NA value 
+# ch4ex2.bh <- na.omit(ch4ex2.bh)
+
+theme_set(theme_gray(base_size = 15)) 
+
+target_indx <- which( colnames(ch4ex2.bh) == "badh" )
+ch4ex2.bh[,target_indx] <- as.factor(paste0("c", ch4ex2.bh[,target_indx]))
+
+results <- NULL
+for( itree in c(1:9, 10, 20, 50, 100, 200, 300, 400, 500, 600, 700)  ){
+  for(i in 1:20){
+    # set.seed(1)
+    train.ix <- sample(nrow(ch4ex2.bh),floor( nrow(ch4ex2.bh)/2) )
+    rf <- randomForest( badh ~ ., ntree = itree, data = ch4ex2.bh[train.ix,] ) 
+    pred.test <- predict(rf, ch4ex2.bh[-train.ix,],type="class")
+    this.err <-  length(which(pred.test != ch4ex2.bh[-train.ix,]$badh))/length(pred.test) 
+    results <- rbind( results, c(itree, this.err)  )
+  }
+}
+
+
+colnames(results) <- c("num_trees","error")
+results <- as.data.frame(results) %>% mutate(num_trees=as.character(num_trees))
+levels( results$num_trees ) <- unique( results$num_trees  )
+results$num_trees <- factor( results$num_trees , unique( results$num_trees  )  )
+ggplot() +
+  geom_boxplot(data = results, aes(y = error, x = num_trees)) +
+  geom_point(size=3) 
+```
+
+
+Let's create our random forest with 600 trees and analyze which variables are important. From the plot, we see that the most important variables are numvisit and age (in order from greatest to least importance). 
+```{r}
+# creating the random forest
+random_forest_1_ex2 <- randomForest(badh ~ ., ntree = 600, data = ch4ex2.bh ) 
+
+# plotting the importance of each variable
+varImpPlot(random_forest_1_ex2)
+```
+
+
+
+We now test to see how the node size affects the error rate. We notice that there are not major changes when different node sizes are considered. We will choose to have a node size of 9, since this node size corresponds to one of the best box plots. 
+```{r}
+set.seed(1)
+results <- NULL
+for( inodesize in c(1:10, 15)  ){
+for(i in 1:20){
+train.ix <- sample(nrow(ch4ex2.bh),floor( nrow(ch4ex2.bh)/2) )
+rf <- randomForest( badh ~ ., ntree = 600, nodesize = inodesize, data = ch4ex2.bh[train.ix,] ) 
+pred.test <- predict(rf, ch4ex2.bh[-train.ix,],type="class")
+this.err <-  length(which(pred.test != ch4ex2.bh[-train.ix,]$badh))/length(pred.test) 
+results <- rbind( results, c(inodesize, this.err)  )
+}
+}
+
+colnames(results) <- c("node_size","error")
+results <- as.data.frame(results) %>% mutate(node_size=as.character(node_size))
+levels( results$node_size ) <- unique( results$node_size  )
+results$node_size <- factor( results$node_size , unique( results$node_size  )  )
+ggplot() +
+geom_boxplot(data = results, aes(y = error, x = node_size)) +
+geom_point(size=3) 
+```
+
+
+Thus far we have considered the number of trees, the size of the nodes, and the importance of each predictor variable. Choosing the best of each of these categories, we create our final random forest. 
+```{r} 
+# create the random forest
+random_forest_3_ex2 <- randomForest(badh ~ ., ntree = 600, nodesize = 9, data = ch4ex2.bh) 
+```
+
+We now compare the results of the random forests. The random forest with 600 trees (random_forest_1_ex2) gave us an OOB error of 11%; the random forest with 600 trees and a node size of 9 (random_forest_3_ex2) gave us an OOB error of 10.83%. Moreover, random_forest_3_ex2 has the minimum number (22) of instances misclassifying class c0 and the second minimum number (100) of instances misclassifying the class c1. We conclude that random_forest_3_ex2 is the best (out of three) random forest for the given dataset. 
+```{r} 
+random_forest_1_ex2
+random_forest_3_ex2
+```
+Change the nodesize to 8 improved the OOB error from 11% to 10.83%. Given these predictors, this model can determine whether or not a patient has bad health approximate 89% accuracy rate. 
 
 # Chapter 4, Exercise 3
 Pick up any dataset you have used, and randomly split the data into two halves. Use one half to build the random forest model. Test the model's prediction performance on the second half. Report what you have found, adjust your way of model building, and suggest a strategy to find the model you consider as the best.
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+require(randomForest)
+set.seed(1)
+ch4ex3.gpa <- read.csv("MedGPA.csv", colClasses = c("character",rep("factor",3),rep("numeric",2),rep("integer",6)))
+
+#Remove first column
+ch4ex3.gpa <- ch4ex3.gpa %>% select(-X)
+ch4ex3.gpa <- ch4ex3.gpa[,-c(1)]
+
+target_indx <- which( colnames(ch4ex3.gpa) == "Acceptance" )
+ch4ex3.gpa[,target_indx] <- as.factor(paste0("c", ch4ex3.gpa[,target_indx]))
+
+# we will remove the one observation which has an NA value 
+ch4ex3.gpa <- na.omit(ch4ex3.gpa)
+
+#divide the data into two
+set.seed(1)
+sample_first_half <- sample(nrow(ch4ex3.gpa),floor( nrow(ch4ex3.gpa)/2) )
+check<-ch4ex3.gpa[sample_first_half,]
+check_2<-ch4ex3.gpa[-sample_first_half,]
+```
+
+<Error versus number of trees in a random forest model>
+```{r}
+set.seed(1)
+
+results <- NULL
+for( itree in c(1:9, 10, 20, 50, 100, 200, 300, 400, 500, 600, 700)  ){
+  for(i in 1:20){
+    
+    rf <- randomForest( Acceptance ~ ., ntree = itree, data = check ) 
+    pred.test <- predict(rf, check_2,type="class")
+    this.err <-  length(which(pred.test != check_2$Acceptance))/length(pred.test) 
+    results <- rbind( results, c(itree, this.err)  )
+  }
+}
+
+
+colnames(results) <- c("num_trees","error")
+results <- as.data.frame(results) %>% mutate(num_trees=as.character(num_trees))
+levels( results$num_trees ) <- unique( results$num_trees  )
+results$num_trees <- factor( results$num_trees , unique( results$num_trees  )  )
+ggplot() +
+  geom_boxplot(data = results, aes(y = error, x = num_trees)) +
+  geom_point(size=3) 
+```
+We notice that prediction performance of random forest stabilizes after the trees reaches 300. We will use a random forest of 300 trees in our calculations.   
+
+
+
+Let's create our random forest with 300 trees and analyze which variables are important. From the plot, we see that the most important variables are GPA, BS, BCPM , PS (in order from greatest to least importance). 
+```{r}
+# creating the random forest
+random_forest_1_ex3 <- randomForest(Acceptance ~ ., ntree = 300, data = check ) 
+
+# plotting the importance of each variable
+varImpPlot(random_forest_1_ex3 )
+```
+
+
+We create a random forest of 300 trees with the previously defined important variables. Since the importance of the variables can change (since the predictors changed), we plot their importance yet again. We notice that all of the considered variables are even more important now, and their order of importance has changed. The order of importance of the predictors now is: grade point average (GPA),Bio/Chem/Physics/Math grade point average (BCPM), PS and BS. 
+We will only consider these predictors in our model from now on. 
+```{r}
+# create the random forest
+random_forest_2_ex3 <- randomForest(Acceptance ~  GPA + BCPM + BS + PS , ntree = 300, data = check ) 
+
+# plotting the importance of each variable
+varImpPlot(random_forest_2_ex3)
+```
+
+
+We now test to see how the node size affects the error rate. We notice that there are not major changes when different node sizes are considered. We will choose to have a node size of 7, since this node size corresponds to one of the best box plots. 
+```{r}
+set.seed(1)
+results <- NULL
+for( inodesize in c(1:10, 15)  ){
+for(i in 1:20){
+
+rf <- randomForest( Acceptance ~ GPA + BCPM+ BS + PS, ntree = 300, nodesize = inodesize, data = check ) 
+pred.test <- predict(rf, check_2,type="class")
+this.err <-  length(which(pred.test != check_2$Acceptance))/length(pred.test) 
+results <- rbind( results, c(inodesize, this.err)  )
+}
+}
+
+colnames(results) <- c("node_size","error")
+results <- as.data.frame(results) %>% mutate(node_size=as.character(node_size))
+levels( results$node_size ) <- unique( results$node_size  )
+results$node_size <- factor( results$node_size , unique( results$node_size  )  )
+ggplot() +
+geom_boxplot(data = results, aes(y = error, x = node_size)) +
+geom_point(size=3) 
+```
+
+
+Thus far we have considered the number of trees, the size of the nodes, and the importance of each predictor variable. Choosing the best of each of these categories, we create our final random forest. 
+```{r} 
+# create the random forest
+random_forest_3_ex3 <- randomForest(Acceptance ~ GPA + BCPM+ BS + PS, ntree = 300, nodesize = 7, data = check) 
+```
+
+We now compare the results of the random forests. The random forest with 300 trees (random_forest_1) gave us an OOB error of 29.63%; the random forest with 300 trees and 4 predictors (random_forest_2) gave us an OOB error of 33.33%; and the random forest with 300 trees, 4 predictors, and a node size of 7 (random_forest_3) gave us an OOB error of 25.93%. Moreover, random_forest_3 has the minimum number (3) of instances misclassifying class c0 and the second minimum number (4) of instances misclassifying the class c1. We conclude that random_forest_3 is the best (out of three) random forest for the given dataset. 
+```{r} 
+random_forest_1_ex3
+random_forest_2_ex3
+random_forest_3_ex3
+```
+As we divide the data into two data, the results using different data set showed different results than those we got from the the chapter 4, exercise 2. The OOB error increased from the first random forect to the second random forest with 4 predictors. The important predictors are: grade point average, Bio/Chem/Physics/Math grade point average, and Biological Sciences subscore and phsics subscore. Given these predictors, this model can determine whether or not a student will be accepted with an approximate 74% accuracy rate. 
 
 # Chapter 4, Exercise 4
 Write your own R script to use Bootstrap to evaluate the significance of the regression parameters of logistic regression model. Compare your results with the output from glm().
