@@ -378,7 +378,7 @@ geom_point(size=3) </code></pre>
 <p>Thus far we have considered the number of trees, the size of the nodes, and the importance of each predictor variable. Choosing the best of each of these categories, we create our final random forest.</p>
 <pre class="r"><code># create the random forest
 random_forest_3 &lt;- randomForest(Acceptance ~ BS + GPA + BCPM, ntree = 50, nodesize = 8, data = ch4ex2.gpa) </code></pre>
-<p>We now compare the results of the random forests. The random forest with 50 trees (random_forest_1) gave us an OOB error of 29.63%; the random forest with 50 trees and 3 predictors (random_forest_2) gave us an OOB error of 22.22%; and the random forest with 50 trees, 3 predictors, and a node size of 8 (random_forest_3) gave us an OOB error of 20.37%. Moreover, random_forest_3 has the minimum number (5) of instances misclassifying class c0 and the second minimum number (6) of instances misclassifying the class c1. We conclude that random_forest_3 is the best (out of three) random forest for the given dataset.</p>
+<p>We now compare the results of the random forests. The random forest with 50 trees (random_forest_1) gave us an OOB error of 22.22%; the random forest with 50 trees and 3 predictors (random_forest_2) gave us an OOB error of 29.63%; and the random forest with 50 trees, 3 predictors, and a node size of 8 (random_forest_3) gave us an OOB error of 20.37%. Moreover, random_forest_3 has the minimum number (5) of instances misclassifying class c0 and the second minimum number (6) of instances misclassifying the class c1. We conclude that random_forest_3 is the best (out of three) random forest for the given dataset.</p>
 <pre class="r"><code>random_forest_1</code></pre>
 <pre><code>## 
 ## Call:
